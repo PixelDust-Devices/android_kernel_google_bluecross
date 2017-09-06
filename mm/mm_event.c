@@ -39,9 +39,9 @@ static void record_vmstat(void)
 	spin_unlock(&vmstat_lock);
 
 	memset(&vmstat, 0, sizeof(vmstat));
-	vmstat.free = global_page_state(NR_FREE_PAGES);
-	vmstat.slab = global_page_state(NR_SLAB_RECLAIMABLE) +
-			global_page_state(NR_SLAB_UNRECLAIMABLE);
+	vmstat.free = global_zone_page_state(NR_FREE_PAGES);
+	vmstat.slab = global_zone_page_state(NR_SLAB_RECLAIMABLE) +
+			global_zone_page_state(NR_SLAB_UNRECLAIMABLE);
 
 	vmstat.file = global_node_page_state(NR_ACTIVE_FILE) +
 			global_node_page_state(NR_INACTIVE_FILE);
