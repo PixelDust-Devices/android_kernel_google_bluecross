@@ -4329,7 +4329,7 @@ long si_mem_available(void)
 	 * Estimate the amount of memory available for userspace allocations,
 	 * without causing swapping.
 	 */
-	available = global_page_state(NR_FREE_PAGES) - totalreserve_pages;
+	available = global_zone_page_state(NR_FREE_PAGES) - totalreserve_pages;
 
 	/*
 	 * Not all the page cache can be freed, otherwise the system will
@@ -4344,8 +4344,8 @@ long si_mem_available(void)
 	 * Part of the reclaimable slab consists of items that are in use,
 	 * and cannot be freed. Cap this estimate at the low watermark.
 	 */
-	available += global_page_state(NR_SLAB_RECLAIMABLE) -
-		     min(global_page_state(NR_SLAB_RECLAIMABLE) / 2, wmark_low);
+	available += global_zone_page_state(NR_SLAB_RECLAIMABLE) -
+		     min(global_zone_page_state(NR_SLAB_RECLAIMABLE) / 2, wmark_low);
 
 	/*
 	 * Part of the kernel memory, which can be released under memory
@@ -4364,7 +4364,7 @@ void si_meminfo(struct sysinfo *val)
 {
 	val->totalram = totalram_pages;
 	val->sharedram = global_node_page_state(NR_SHMEM);
-	val->freeram = global_page_state(NR_FREE_PAGES);
+	val->freeram = global_zone_page_state(NR_FREE_PAGES);
 	val->bufferram = nr_blockdev_pages();
 	val->totalhigh = totalhigh_pages;
 	val->freehigh = nr_free_highpages();
@@ -4496,17 +4496,17 @@ void show_free_areas(unsigned int filter)
 		global_node_page_state(NR_FILE_DIRTY),
 		global_node_page_state(NR_WRITEBACK),
 		global_node_page_state(NR_UNSTABLE_NFS),
-		global_page_state(NR_SLAB_RECLAIMABLE),
-		global_page_state(NR_SLAB_UNRECLAIMABLE),
+		global_zone_page_state(NR_SLAB_RECLAIMABLE),
+		global_zone_page_state(NR_SLAB_UNRECLAIMABLE),
 		global_node_page_state(NR_FILE_MAPPED),
 		global_node_page_state(NR_SHMEM),
-		global_page_state(NR_PAGETABLE),
-		global_page_state(NR_BOUNCE),
-		global_page_state(NR_FREE_PAGES),
+		global_zone_page_state(NR_PAGETABLE),
+		global_zone_page_state(NR_BOUNCE),
+		global_zone_page_state(NR_FREE_PAGES),
 		free_pcp,
-		global_page_state(NR_FREE_CMA_PAGES),
+		global_zone_page_state(NR_FREE_CMA_PAGES),
 #if IS_ENABLED(CONFIG_ZSMALLOC)
-		global_page_state(NR_ZSPAGES),
+		global_zone_page_state(NR_ZSPAGES),
 #else
 		0UL,
 #endif

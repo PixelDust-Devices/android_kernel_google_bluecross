@@ -1655,7 +1655,7 @@ static unsigned long minimum_image_size(unsigned long saveable)
 {
 	unsigned long size;
 
-	size = global_page_state(NR_SLAB_RECLAIMABLE)
+	size = global_zone_page_state(NR_SLAB_RECLAIMABLE)
 		+ global_node_page_state(NR_ACTIVE_ANON)
 		+ global_node_page_state(NR_INACTIVE_ANON)
 		+ global_node_page_state(NR_ACTIVE_FILE)
