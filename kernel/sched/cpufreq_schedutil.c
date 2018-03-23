@@ -99,6 +99,15 @@ static DEFINE_PER_CPU(struct sugov_tunables *, cached_tunables);
 
 /************************ Governor internals ***********************/
 
+static inline bool use_pelt(void)
+{
+#ifdef CONFIG_SCHED_WALT
+	return (!sysctl_sched_use_walt_cpu_util || walt_disabled);
+#else
+	return true;
+#endif
+}
+
 static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 {
 	s64 delta_ns;
@@ -182,7 +191,8 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 		policy->cur = next_freq;
 		trace_cpu_frequency(next_freq, smp_processor_id());
 	} else {
-		sg_policy->work_in_progress = true;
+		if (use_pelt())
+			sg_policy->work_in_progress = true;
 		irq_work_queue(&sg_policy->irq_work);
 	}
 }
@@ -394,7 +404,7 @@ static void sugov_track_cycles(struct sugov_policy *sg_policy,
 	u64 delta_ns, cycles;
 	u64 next_ws = sg_policy->last_ws + sched_ravg_window;
 
-	if (unlikely(!sysctl_sched_use_walt_cpu_util))
+	if (use_pelt())
 		return;
 
 	upto = min(upto, next_ws);
@@ -413,7 +423,7 @@ static void sugov_calc_avg_cap(struct sugov_policy *sg_policy, u64 curr_ws,
 	u64 last_ws = sg_policy->last_ws;
 	unsigned int avg_freq;
 
-	if (unlikely(!sysctl_sched_use_walt_cpu_util))
+	if (use_pelt())
 		return;
 
 	WARN_ON(curr_ws < last_ws);
@@ -446,7 +456,7 @@ static void sugov_walt_adjust(struct sugov_cpu *sg_cpu, unsigned long *util,
 	unsigned long cpu_util = sg_cpu->util;
 	bool is_hiload;
 
-	if (unlikely(!sysctl_sched_use_walt_cpu_util))
+	if (use_pelt())
 		return;
 
 	is_hiload = (cpu_util >= mult_frac(sg_policy->avg_cap,
@@ -497,7 +507,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	if (!sugov_should_update_freq(sg_policy, time))
 		return;
 
-	busy = sugov_cpu_is_busy(sg_cpu);
+	busy = use_pelt() && sugov_cpu_is_busy(sg_cpu);
 
 	raw_spin_lock(&sg_policy->update_lock);
 	if (flags & SCHED_CPUFREQ_RT_DL) {
@@ -639,7 +649,8 @@ static void sugov_work(struct kthread_work *work)
 				CPUFREQ_RELATION_L);
 	mutex_unlock(&sg_policy->work_lock);
 
-	sg_policy->work_in_progress = false;
+	if (use_pelt())
+		sg_policy->work_in_progress = false;
 }
 
 static void sugov_irq_work(struct irq_work *irq_work)
