@@ -4075,8 +4075,10 @@ int ufshcd_query_descriptor(struct ufs_hba *hba,
 	int retries;
 
 	for (retries = QUERY_REQ_RETRIES; retries > 0; retries--) {
+		err = -EAGAIN;
 		down_read(&hba->query_lock);
-		err = __ufshcd_query_descriptor(hba, opcode, idn, index,
+		if (!ufshcd_is_link_hibern8(hba))
+			err = __ufshcd_query_descriptor(hba, opcode, idn, index,
 						selector, desc_buf, buf_len);
 		up_read(&hba->query_lock);
 		if (!err || err == -EINVAL)
@@ -9781,12 +9783,6 @@ static int ufshcd_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 			 hba->rpm_lvl : hba->spm_lvl;
 		req_dev_pwr_mode = ufs_get_pm_lvl_to_dev_pwr_mode(pm_lvl);
 		req_link_state = ufs_get_pm_lvl_to_link_pwr_state(pm_lvl);
-
-		if (ufshcd_is_auto_hibern8_supported(hba) &&
-				req_link_state == UIC_LINK_HIBERN8_STATE) {
-			ret = -EINVAL;
-			goto out;
-		}
 	} else {
 		req_dev_pwr_mode = UFS_POWERDOWN_PWR_MODE;
 		req_link_state = UIC_LINK_OFF_STATE;
