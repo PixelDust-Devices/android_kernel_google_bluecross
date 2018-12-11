@@ -35,6 +35,9 @@
 #define BL_STATE_LP2		BL_CORE_DRIVER2
 #define BL_HBM 			1023
 
+bool backlight_dimmer = 0;
+module_param(backlight_dimmer, bool, 0644);
+
 static int hbm_enable = 0;
 static struct dsi_backlight_config *bl_g;
 static struct device *fb0_device;
@@ -47,7 +50,7 @@ static void enable_hbm(int enable)
 	u32 target_range = enable ? bl_g->hbm->num_ranges - 1 : 0;
 	range = hbm->ranges + target_range;
 
-	if(dsi_panel_cmd_set_transfer(panel, &range->dsi_cmd))
+	if(dsi_panel_cmd_set_transfer(panel, &range->entry_cmd))
 		pr_err("Failed to send command for range %d\n",	enable);
 }
 
@@ -192,7 +195,7 @@ static u32 dsi_backlight_calculate_normal(struct dsi_backlight_config *bl,
 		/* map UI brightness into driver backlight level rounding it */
 		rc = dsi_backlight_lerp(
 			1, bl->brightness_max_level,
-			bl->bl_min_level ? : 1, bl->bl_max_level,
+			backlight_dimmer ? 1 : bl->bl_min_level, bl->bl_max_level,
 			brightness, &bl_lvl);
 		if (unlikely(rc))
 			pr_err("failed to linearly interpolate, brightness unmodified\n");
