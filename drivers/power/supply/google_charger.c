@@ -270,8 +270,9 @@ static int is_charging_disabled(struct chg_drv *chg_drv, int capacity)
 	if ((upperbd > lowerbd) &&
 	    (upperbd <= DEFAULT_CHARGE_STOP_LEVEL) &&
 	    (lowerbd >= DEFAULT_CHARGE_START_LEVEL)) {
-		if (chg_drv->lowerdb_reached && upperbd <= capacity) {
-			pr_debug("%s: lowerbd=%d, upperbd=%d, capacity=%d, lowerdb_reached=1->0, charging off\n",
+		if (chg_drv->lowerdb_reached && min(upperbd + 1,
+			DEFAULT_CHARGE_STOP_LEVEL) <= capacity) {
+			pr_info("%s: lowerbd=%d, upperbd=%d, capacity=%d, lowerdb_reached=1->0, charging off\n",
 				__func__, lowerbd, upperbd, capacity);
 			disable_charging = 1;
 			chg_drv->lowerdb_reached = false;
