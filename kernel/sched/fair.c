@@ -6926,11 +6926,11 @@ static unsigned long cpu_estimated_capacity(int cpu, struct task_struct *p)
 static bool is_packing_eligible(struct task_struct *p, int target_cpu,
 				struct find_best_target_env *fbt_env,
 				unsigned int target_cpus_count,
-				int best_idle_cstate)
+				int best_idle_cstate, bool boosted)
 {
 	unsigned long estimated_capacity;
 
-	if (fbt_env->placement_boost || fbt_env->need_idle)
+	if (fbt_env->placement_boost || fbt_env->need_idle || boosted)
 		return false;
 
 	if (best_idle_cstate == -1)
@@ -7333,7 +7333,7 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 		 * next cluster if they are higher in capacity. If we are
 		 * not in any kind of boost, we break.
 		 */
-		if (!prefer_idle &&
+		if (!prefer_idle && !boosted &&
 			(target_cpu != -1 || best_idle_cpu != -1) &&
 			(fbt_env->placement_boost == SCHED_BOOST_NONE ||
 			(fbt_env->placement_boost == SCHED_BOOST_ON_BIG &&
@@ -7343,9 +7343,12 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 		/*
 		 * if we are in prefer_idle and have found an idle cpu,
 		 * break from searching more groups based on the stune.boost and
-		 * group cpu capacity.
+		 * group cpu capacity. For !prefer_idle && boosted case, don't
+		 * iterate lower capacity CPUs unless the task can't be
+		 * accommodated in the higher capacity CPUs.
 		 */
-		if (prefer_idle && best_idle_cpu != -1) {
+		if ((prefer_idle && best_idle_cpu != -1) ||
+		    (boosted && (best_idle_cpu != -1 || target_cpu != -1))) {
 			if (boosted) {
 				if (!next_group_higher_cap)
 					break;
@@ -7358,8 +7361,8 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	} while (sg = sg->next, sg != sd->groups);
 
 	if (best_idle_cpu != -1 && !is_packing_eligible(p, target_cpu, fbt_env,
-					active_cpus_count, best_idle_cstate)) {
-
+					active_cpus_count, best_idle_cstate,
+					boosted)) {
 		target_cpu = best_idle_cpu;
 		best_idle_cpu = -1;
 	}
@@ -7535,7 +7538,7 @@ static inline struct cpumask *find_rtg_target(struct task_struct *p)
 static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu,
 				   int sync_boost)
 {
-	bool boosted, prefer_idle;
+	bool prefer_idle;
 	struct sched_domain *sd;
 	int target_cpu;
 	int backup_cpu = -1;
@@ -7543,6 +7546,7 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu,
 	struct cpumask *rtg_target = find_rtg_target(p);
 	struct find_best_target_env fbt_env;
 	u64 start_t = 0;
+	bool boosted = task_is_boosted(p);
 
 	fbt_env.fastpath = 0;
 
@@ -7553,7 +7557,6 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu,
 	schedstat_inc(this_rq()->eas_stats.secb_attempts);
 
 	rcu_read_lock();
-	boosted = task_is_boosted(p);
 #ifdef CONFIG_CGROUP_SCHEDTUNE
 	prefer_idle = schedtune_prefer_idle(p) > 0;
 #else
@@ -7586,7 +7589,7 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu,
 		goto unlock;
 	}
 
-	if (fbt_env.placement_boost || fbt_env.need_idle ||
+	if (fbt_env.placement_boost || fbt_env.need_idle || boosted ||
 			(rtg_target && (!cpumask_test_cpu(prev_cpu, rtg_target) ||
 			cpumask_test_cpu(next_cpu, rtg_target)))) {
 		target_cpu = next_cpu;
@@ -7657,7 +7660,8 @@ unlock:
 	trace_sched_task_util(p, next_cpu, backup_cpu, target_cpu,
 			      fbt_env.need_idle, fbt_env.fastpath,
 			      fbt_env.placement_boost, rtg_target ?
-			      cpumask_first(rtg_target) : -1, start_t);
+			      cpumask_first(rtg_target) : -1, start_t,
+			      boosted);
 	return target_cpu;
 }
 
