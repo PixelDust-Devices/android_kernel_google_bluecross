@@ -67,6 +67,10 @@ int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 		policy->min = CONFIG_CPU_FREQ_DEFAULT_BIG_MIN;
 #endif
 
+	if (cpumask_test_cpu(policy->cpu, cpu_perf_mask) &&
+			CONFIG_CPU_FREQ_DEFAULT_PERF_MAX > 0)
+		policy->max = CONFIG_CPU_FREQ_DEFAULT_PERF_MAX;
+
 	if (policy->min == ~0)
 		return -EINVAL;
 	else
