@@ -17,6 +17,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include <linux/binfmts.h>
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
 #include <linux/cpufreq_times.h>
@@ -772,7 +773,7 @@ static ssize_t store_##file_name					\
 	struct cpufreq_policy new_policy;				\
 									\
 	if (IS_ENABLED(CONFIG_CPU_INPUT_BOOST) &&			\
-		&policy->object == &policy->min)			\
+	    &policy->object == &policy->min)			\
 		return count;						\
 									\
 	memcpy(&new_policy, policy, sizeof(*policy));			\
