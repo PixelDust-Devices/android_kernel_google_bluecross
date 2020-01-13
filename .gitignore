@@ -40,6 +40,9 @@ Module.symvers
 *.su
 *.c.[012]*.*
 
+# Kernel build default out path
+out/
+
 #
 # Top-level generic files
 #
