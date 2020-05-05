@@ -6204,7 +6204,6 @@ void hdd_unregister_notifiers(hdd_context_t *hdd_ctx)
 static void hdd_exit_netlink_services(hdd_context_t *hdd_ctx)
 {
 	spectral_scan_deactivate_service();
-	cnss_diag_deactivate_service();
 	hdd_close_cesium_nl_sock();
 	ptt_sock_deactivate_svc();
 	oem_deactivate_service();
