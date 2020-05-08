@@ -6257,7 +6257,6 @@ static int hdd_init_netlink_services(hdd_context_t *hdd_ctx)
 	return 0;
 
 err_cnss_diag:
-	cnss_diag_deactivate_service();
 err_close_cesium:
 	hdd_close_cesium_nl_sock();
 	ptt_sock_deactivate_svc();
