@@ -224,13 +224,13 @@ static void pr_info_states(struct power_supply *chg_psy,
 {
 	int usb_type = PSY_GET_PROP(usb_psy, POWER_SUPPLY_PROP_REAL_TYPE);
 
-	pr_info("l=%d vb=%d vc=%d c=%d fv=%d t=%d s=%s usb=%d wlc=%d\n",
+	pr_debug("l=%d vb=%d vc=%d c=%d fv=%d t=%d s=%s usb=%d wlc=%d\n",
 		soc, vbatt / 1000, vchrg / 1000, ibatt / 1000,
 		fv_uv, temp, psy_chgt_str[chg_type],
 		usb_present, wlc_online);
 
 	if (usb_present)
-		pr_info("usbchg=%s usbv=%d usbc=%d usbMv=%d usbMc=%d\n",
+		pr_debug("usbchg=%s usbv=%d usbc=%d usbMv=%d usbMc=%d\n",
 			psy_usb_type_str[usb_type],
 			PSY_GET_PROP(usb_psy,
 				     POWER_SUPPLY_PROP_VOLTAGE_NOW) / 1000,
@@ -242,7 +242,7 @@ static void pr_info_states(struct power_supply *chg_psy,
 				     POWER_SUPPLY_PROP_CURRENT_MAX) / 1000);
 
 	if (wlc_online)
-		pr_info("wlcv=%d wlcc=%d wlcMv=%d wlcMc=%d wlct=%d\n",
+		pr_debug("wlcv=%d wlcc=%d wlcMv=%d wlcMc=%d wlct=%d\n",
 			PSY_GET_PROP(wlc_psy,
 				     POWER_SUPPLY_PROP_VOLTAGE_NOW) / 1000,
 			PSY_GET_PROP(wlc_psy,
@@ -271,20 +271,20 @@ static int is_charging_disabled(struct chg_drv *chg_drv, int capacity)
 	    (upperbd <= DEFAULT_CHARGE_STOP_LEVEL) &&
 	    (lowerbd >= DEFAULT_CHARGE_START_LEVEL)) {
 		if (chg_drv->lowerdb_reached && upperbd <= capacity) {
-			pr_info("%s: lowerbd=%d, upperbd=%d, capacity=%d, lowerdb_reached=1->0, charging off\n",
+			pr_debug("%s: lowerbd=%d, upperbd=%d, capacity=%d, lowerdb_reached=1->0, charging off\n",
 				__func__, lowerbd, upperbd, capacity);
 			disable_charging = 1;
 			chg_drv->lowerdb_reached = false;
 		} else if (!chg_drv->lowerdb_reached && lowerbd < capacity) {
-			pr_info("%s: lowerbd=%d, upperbd=%d, capacity=%d, charging off\n",
+			pr_debug("%s: lowerbd=%d, upperbd=%d, capacity=%d, charging off\n",
 				__func__, lowerbd, upperbd, capacity);
 			disable_charging = 1;
 		} else if (!chg_drv->lowerdb_reached && capacity <= lowerbd) {
-			pr_info("%s: lowerbd=%d, upperbd=%d, capacity=%d, lowerdb_reached=0->1, charging on\n",
+			pr_debug("%s: lowerbd=%d, upperbd=%d, capacity=%d, lowerdb_reached=0->1, charging on\n",
 				__func__, lowerbd, upperbd, capacity);
 			chg_drv->lowerdb_reached = true;
 		} else {
-			pr_info("%s: lowerbd=%d, upperbd=%d, capacity=%d, charging on\n",
+			pr_debug("%s: lowerbd=%d, upperbd=%d, capacity=%d, charging on\n",
 				__func__, lowerbd, upperbd, capacity);
 		}
 	}
@@ -343,7 +343,7 @@ static int msc_round_fv_uv(struct chg_profile *profile, int vtier, int fv_uv)
 	result = fv_uv - (fv_uv % profile->cv_hw_resolution);
 
 	if (fv_uv_max != 0)
-		pr_info("MSC_ROUND: fv_uv=%d vtier=%d fv_uv_max=%d -> %d\n",
+		pr_debug("MSC_ROUND: fv_uv=%d vtier=%d fv_uv_max=%d -> %d\n",
 			fv_uv, vtier, fv_uv_max, result);
 
 	return result;
@@ -517,7 +517,7 @@ static void chg_work(struct work_struct *work)
 		if (chg_drv->vbatt_idx == -1)
 			vbatt_idx = msc_voltage_idx(profile, vbatt);
 
-		pr_info("MSC_SEED temp=%d vbatt=%d temp_idx:%d->%d, vbatt_idx:%d->%d\n",
+		pr_debug("MSC_SEED temp=%d vbatt=%d temp_idx:%d->%d, vbatt_idx:%d->%d\n",
 			temp, vbatt, chg_drv->temp_idx, temp_idx,
 			chg_drv->vbatt_idx, vbatt_idx);
 
@@ -535,7 +535,7 @@ static void chg_work(struct work_struct *work)
 		vbatt_idx = msc_voltage_idx(profile, vbatt);
 		update_interval = profile->cv_update_interval;
 
-		pr_info("MSC_DSG vbatt_idx:%d->%d vbatt=%d ibatt=%d fv_uv=%d cv_cnt=%d ov_cnt=%d\n",
+		pr_debug("MSC_DSG vbatt_idx:%d->%d vbatt=%d ibatt=%d fv_uv=%d cv_cnt=%d ov_cnt=%d\n",
 			chg_drv->vbatt_idx, vbatt_idx,
 			vbatt, ibatt, fv_uv,
 			chg_drv->checked_cv_cnt,
@@ -547,7 +547,7 @@ static void chg_work(struct work_struct *work)
 		 * tiers with max charge current == 0.
 		 * NOTE: should I use a voltage limit instead?
 		 */
-		pr_info("MSC_LAST vbatt=%d ibatt=%d fv_uv=%d\n",
+		pr_debug("MSC_LAST vbatt=%d ibatt=%d fv_uv=%d\n",
 			vbatt, ibatt, fv_uv);
 	} else {
 		const int vtier = profile->volt_limits[vbatt_idx];
@@ -588,17 +588,17 @@ static void chg_work(struct work_struct *work)
 			/* no pullback, next tier if already counting */
 				vbatt_idx = chg_drv->vbatt_idx + 1;
 
-				pr_info("MSC_VSWITCH vt=%d vb=%d ibatt=%d\n",
+				pr_debug("MSC_VSWITCH vt=%d vb=%d ibatt=%d\n",
 					vtier, vbatt, ibatt);
 			} else if (-ibatt == cc_max) {
 			/* pullback, double penalty if at full current */
 				chg_drv->checked_ov_cnt *= 2;
 
-				pr_info("MSC_VOVER vt=%d  vb=%d ibatt=%d fv_uv=%d->%d\n",
+				pr_debug("MSC_VOVER vt=%d  vb=%d ibatt=%d fv_uv=%d->%d\n",
 					vtier, vbatt, ibatt,
 					chg_drv->fv_uv, fv_uv);
 			} else {
-				pr_info("MSC_PULLBACK vt=%d vb=%d ibatt=%d fv_uv=%d->%d\n",
+				pr_debug("MSC_PULLBACK vt=%d vb=%d ibatt=%d fv_uv=%d->%d\n",
 					vtier, vbatt, ibatt,
 					chg_drv->fv_uv, fv_uv);
 			}
@@ -627,7 +627,7 @@ static void chg_work(struct work_struct *work)
 			if (chg_drv->checked_cv_cnt == 0)
 				chg_drv->checked_cv_cnt = 1;
 
-			pr_info("MSC_FAST vt=%d vb=%d fv_uv=%d->%d vchrg=%d cv_cnt=%d \n",
+			pr_debug("MSC_FAST vt=%d vb=%d fv_uv=%d->%d vchrg=%d cv_cnt=%d \n",
 				vtier, vbatt, chg_drv->fv_uv, fv_uv,
 				vchrg, chg_drv->checked_cv_cnt);
 
@@ -640,14 +640,14 @@ static void chg_work(struct work_struct *work)
 			update_interval = profile->cv_update_interval;
 			chg_drv->checked_cv_cnt = 0;
 
-			pr_info("MSC_TYPE vt=%d vb=%d fv_uv=%d chg_type=%d\n",
+			pr_debug("MSC_TYPE vt=%d vb=%d fv_uv=%d chg_type=%d\n",
 				vtier, vbatt, fv_uv, chg_type);
 
 		} else if (chg_drv->checked_cv_cnt + chg_drv->checked_ov_cnt) {
 		/* TAPER_COUNTDOWN: countdown to raise fv_uv and/or check
 		 * for tier switch, will keep steady...
 		 */
-			pr_info("MSC_DLY vt=%d vb=%d fv_uv=%d margin=%d cv_cnt=%d, ov_cnt=%d, skip_cnt=%d\n",
+			pr_debug("MSC_DLY vt=%d vb=%d fv_uv=%d margin=%d cv_cnt=%d, ov_cnt=%d, skip_cnt=%d\n",
 				vtier, vbatt, fv_uv, profile->cv_range_accuracy,
 				chg_drv->checked_cv_cnt,
 				chg_drv->checked_ov_cnt, skip_cnt);
@@ -665,7 +665,7 @@ static void chg_work(struct work_struct *work)
 		/* TAPER_STEADY: close enough to tier, don't need to adjust */
 			update_interval = profile->cv_update_interval;
 
-			pr_info("MSC_STEADY vt=%d vb=%d fv_uv=%d margin=%d\n",
+			pr_debug("MSC_STEADY vt=%d vb=%d fv_uv=%d margin=%d\n",
 				vtier, vbatt, fv_uv,
 				profile->cv_range_accuracy);
 		} else {
@@ -679,13 +679,13 @@ static void chg_work(struct work_struct *work)
 			/* debounce next taper voltage adjustment */
 			chg_drv->checked_cv_cnt = profile->cv_debounce_cnt;
 
-			pr_info("MSC_RAISE vt=%d vb=%d fv_uv=%d->%d\n",
+			pr_debug("MSC_RAISE vt=%d vb=%d fv_uv=%d->%d\n",
 				vtier, vbatt, chg_drv->fv_uv, fv_uv);
 		}
 
 		if (chg_drv->checked_cv_cnt > 0) {
 		/* debounce period on tier switch */
-			pr_info("MSC_WAIT vt=%d vb=%d fv_uv=%d ibatt=%d cv_cnt=%d ov_cnt=%d\n",
+			pr_debug("MSC_WAIT vt=%d vb=%d fv_uv=%d ibatt=%d cv_cnt=%d ov_cnt=%d\n",
 				vtier, vbatt, fv_uv, ibatt,
 				chg_drv->checked_cv_cnt,
 				chg_drv->checked_ov_cnt);
@@ -693,14 +693,14 @@ static void chg_work(struct work_struct *work)
 		/* current over next tier, reset tier switch count */
 			chg_drv->checked_tier_switch_cnt = 0;
 
-			pr_info("MSC_RSTC vt=%d vb=%d fv_uv=%d ibatt=%d cc_next_max=%d t_cnt=%d\n",
+			pr_debug("MSC_RSTC vt=%d vb=%d fv_uv=%d ibatt=%d cc_next_max=%d t_cnt=%d\n",
 				vtier, vbatt, fv_uv, ibatt, cc_next_max,
 				chg_drv->checked_tier_switch_cnt);
 		} else if (chg_drv->checked_tier_switch_cnt >= switch_cnt) {
 		/* next tier, fv_uv detemined at MSC_SET */
 			vbatt_idx = chg_drv->vbatt_idx + 1;
 
-			pr_info("MSC_NEXT tier vb=%d ibatt=%d vbatt_idx=%d->%d\n",
+			pr_debug("MSC_NEXT tier vb=%d ibatt=%d vbatt_idx=%d->%d\n",
 				vbatt, ibatt, chg_drv->vbatt_idx, vbatt_idx);
 		} else {
 		/* current under next tier, increase tier switch count */
@@ -709,7 +709,7 @@ static void chg_work(struct work_struct *work)
 				chg_drv->last_cnt_time = cur_time;
 			}
 
-			pr_info("MSC_NYET ibatt=%d cc_next_max=%d t_cnt=%d, skip_cnt=%d\n",
+			pr_debug("MSC_NYET ibatt=%d cc_next_max=%d t_cnt=%d, skip_cnt=%d\n",
 				ibatt, cc_next_max,
 				chg_drv->checked_tier_switch_cnt, skip_cnt);
 		}
@@ -745,7 +745,7 @@ static void chg_work(struct work_struct *work)
 			if (!skip_cnt) {
 				taper->taper_wa_cnt++;
 				taper->last_taper_wa_cnt_time = curr_time;
-				pr_info("MSC_TAPER ibatt=%d, vbat=%d, soc=%d, taper_cnt=%d, chg_status_fast=%d\n",
+				pr_debug("MSC_TAPER ibatt=%d, vbat=%d, soc=%d, taper_cnt=%d, chg_status_fast=%d\n",
 					vbatt, ibatt, soc, taper->taper_wa_cnt,
 					chg_status_fast);
 			}
@@ -753,7 +753,7 @@ static void chg_work(struct work_struct *work)
 				vbatt_idx++;
 				taper->taper_wa_cnt = 0;
 				taper->last_taper_wa_cnt_time = 0;
-				pr_info("MSC_TAPER next vbatt_idx=%d->%d\n",
+				pr_debug("MSC_TAPER next vbatt_idx=%d->%d\n",
 					chg_drv->vbatt_idx, vbatt_idx);
 			}
 		} else {
@@ -778,7 +778,7 @@ static void chg_work(struct work_struct *work)
 			chg_drv->checked_ov_cnt = 0;
 		}
 
-		pr_info("MSC_SET cv_cnt=%d ov_cnt=%d temp_idx:%d->%d, vbatt_idx:%d->%d, fv=%d->%d, cc_max=%d\n",
+		pr_debug("MSC_SET cv_cnt=%d ov_cnt=%d temp_idx:%d->%d, vbatt_idx:%d->%d, fv=%d->%d, cc_max=%d\n",
 			chg_drv->checked_cv_cnt, chg_drv->checked_ov_cnt,
 			chg_drv->temp_idx, temp_idx, chg_drv->vbatt_idx,
 			vbatt_idx, chg_drv->fv_uv, fv_uv, cc_max);
@@ -846,7 +846,7 @@ handle_rerun:
 		schedule_delayed_work(&chg_drv->chg_work,
 				      msecs_to_jiffies(update_interval));
 	} else {
-		pr_info("stop battery charging work: batt_status=%d\n",
+		pr_debug("stop battery charging work: batt_status=%d\n",
 			batt_status);
 		reset_chg_drv_state(chg_drv);
 	}
@@ -867,13 +867,13 @@ static void dump_profile(struct chg_profile *profile)
 	char buff[256];
 	int ti, vi, count, len = sizeof(buff);
 
-	pr_info("Profile constant charge limits:\n");
+	pr_debug("Profile constant charge limits:\n");
 	count = 0;
 	for (vi = 0; vi < profile->volt_nb_limits; vi++) {
 		count += scnprintf(buff + count, len - count, "  %4d",
 				   profile->volt_limits[vi] / 1000);
 	}
-	pr_info("|T \\ V%s\n", buff);
+	pr_debug("|T \\ V%s\n", buff);
 
 	for (ti = 0; ti < profile->temp_nb_limits - 1; ti++) {
 		count = 0;
@@ -884,7 +884,7 @@ static void dump_profile(struct chg_profile *profile)
 			count += scnprintf(buff + count, len - count, "  %4d",
 					   CCCM_LIMITS(profile, ti, vi) / 1000);
 		}
-		pr_info("%s\n", buff);
+		pr_debug("%s\n", buff);
 	}
 }
 
@@ -1092,7 +1092,7 @@ static int chg_init_chg_profile(struct chg_drv *chg_drv)
 		taper->taper_wa_en = false;
 	}
 
-	pr_info("successfully read charging profile:\n");
+	pr_debug("successfully read charging profile:\n");
 	dump_profile(profile);
 
 	return 0;
@@ -1404,7 +1404,7 @@ static void google_charger_init_work(struct work_struct *work)
 		pr_err("Cannot register power supply notifer, ret=%d\n", ret);
 
 	wakeup_source_init(&chg_drv->chg_ws, "google-charger");
-	pr_info("google_charger_init_work done\n");
+	pr_debug("google_charger_init_work done\n");
 
 	/* catch state changes that happened before registering the notifier */
 	schedule_delayed_work(&chg_drv->chg_work,
@@ -1569,7 +1569,7 @@ static int __init google_charger_init(void)
 static void __init google_charger_exit(void)
 {
 	platform_driver_unregister(&charger_driver);
-	pr_info("unregistered platform driver\n");
+	pr_debug("unregistered platform driver\n");
 }
 
 module_init(google_charger_init);
