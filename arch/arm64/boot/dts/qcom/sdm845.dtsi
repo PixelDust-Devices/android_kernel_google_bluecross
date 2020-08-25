@@ -56,7 +56,7 @@
 			compatible = "arm,armv8";
 			reg = <0x0 0x0>;
 			enable-method = "psci";
-			efficiency = <603>;
+			efficiency = <607>;
 			cache-size = <0x8000>;
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,lmh-dcvs = <&lmh_dcvs0>;
@@ -93,7 +93,7 @@
 			compatible = "arm,armv8";
 			reg = <0x0 0x100>;
 			enable-method = "psci";
-			efficiency = <603>;
+			efficiency = <607>;
 			cache-size = <0x8000>;
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,lmh-dcvs = <&lmh_dcvs0>;
@@ -124,7 +124,7 @@
 			compatible = "arm,armv8";
 			reg = <0x0 0x200>;
 			enable-method = "psci";
-			efficiency = <603>;
+			efficiency = <607>;
 			cache-size = <0x8000>;
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,lmh-dcvs = <&lmh_dcvs0>;
@@ -155,7 +155,7 @@
 			compatible = "arm,armv8";
 			reg = <0x0 0x300>;
 			enable-method = "psci";
-			efficiency = <603>;
+			efficiency = <607>;
 			cache-size = <0x8000>;
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,lmh-dcvs = <&lmh_dcvs0>;
