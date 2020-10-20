@@ -100,7 +100,6 @@ extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
 #else
 static inline void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
 {
-	BUILD_BUG();
 }
 #endif
 

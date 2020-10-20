@@ -2849,7 +2849,6 @@ EXPORT_SYMBOL(unregister_console);
 static int __init printk_late_init(void)
 {
 	struct console *con;
-	int ret;
 
 	for_each_console(con) {
 		if (!keep_bootcon && con->flags & CON_BOOT) {
