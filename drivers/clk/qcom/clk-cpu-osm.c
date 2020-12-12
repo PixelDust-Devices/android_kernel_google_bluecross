@@ -41,8 +41,6 @@
 #include "clk-voter.h"
 #include "clk-debug.h"
 
-#define PERFCL_SKIP 13
-
 #define OSM_INIT_RATE			300000000UL
 #define XO_RATE				19200000UL
 #define OSM_TABLE_SIZE			40
@@ -95,7 +93,6 @@ struct clk_osm {
 	u32 cluster_num;
 	u32 core_num;
 	unsigned long rate;
-	u32 osm_table_size;
 	u64 total_cycle_counter;
 	u32 prev_cycle_counter;
 	u32 max_core_count;
@@ -401,7 +398,6 @@ static struct clk_init_data osm_clks_init[] = {
 static struct clk_osm l3_clk = {
 	.cluster_num = 0,
 	.max_core_count = 4,
-	.osm_table_size = OSM_TABLE_SIZE,
 	.hw.init = &osm_clks_init[0],
 };
 
@@ -413,7 +409,6 @@ static DEFINE_CLK_VOTER_NOCACHE(l3_gpu_vote_clk, l3_clk, 0);
 static struct clk_osm pwrcl_clk = {
 	.cluster_num = 1,
 	.max_core_count = 4,
-	.osm_table_size = OSM_TABLE_SIZE,
 	.hw.init = &osm_clks_init[1],
 };
 
@@ -498,7 +493,6 @@ static struct clk_osm cpu5_pwrcl_clk = {
 static struct clk_osm perfcl_clk = {
 	.cluster_num = 2,
 	.max_core_count = 4,
-	.osm_table_size = OSM_TABLE_SIZE - PERFCL_SKIP,
 	.hw.init = &osm_clks_init[2],
 };
 
@@ -585,19 +579,6 @@ static struct clk_osm *clk_cpu_map[] = {
 	&cpu6_perfcl_clk,
 	&cpu7_perfcl_clk,
 };
-
-static bool should_skip(unsigned int freq, int cpu)
-{
-	unsigned int skip_freqs_big[] = {1536000, 1612800, 1689600, 1766400, 1843200, 1920000, 2092800, 2169600, 2400000, 2745600, 2764800, 2784000, 2803200};
-	int i;
-
-        if (cpu > 3 && cpu < 8)
-                for (i = 0; i < ARRAY_SIZE(skip_freqs_big); i++)
-                        if (freq == skip_freqs_big[i])
-                                return true;
-
-	return false;
-}
 
 static struct clk_osm *logical_cpu_to_clk(int cpu)
 {
@@ -773,13 +754,12 @@ static int osm_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	}
 	xo_kHz = clk_hw_get_rate(p_hw) / 1000;
 
-	table = kcalloc(parent->osm_table_size + 1, sizeof(*table), GFP_KERNEL);
+	table = kcalloc(OSM_TABLE_SIZE + 1, sizeof(*table), GFP_KERNEL);
 	if (!table)
 		return -ENOMEM;
 
-	for (i = 0; i < parent->osm_table_size; i++) {
+	for (i = 0; i < OSM_TABLE_SIZE; i++) {
 		u32 data, src, div, lval, core_count;
-		unsigned int freq;
 
 		data = clk_osm_read_reg(c, FREQ_REG + i * OSM_REG_SIZE);
 		src = (data & GENMASK(31, 30)) >> 30;
@@ -787,12 +767,10 @@ static int osm_cpufreq_cpu_init(struct cpufreq_policy *policy)
 		lval = data & GENMASK(7, 0);
 		core_count = CORE_COUNT_VAL(data);
 
-		freq = (!src) ? OSM_INIT_RATE / 1000 : (XO_RATE * lval) / 1000;
-
-		if (should_skip(freq, policy->cpu))
-			continue;
-
-		table[i].frequency = freq;
+		if (!src)
+			table[i].frequency = OSM_INIT_RATE / 1000;
+		else
+			table[i].frequency = xo_kHz * lval;
 		table[i].driver_data = table[i].frequency;
 
 		if (core_count != parent->max_core_count)
@@ -1048,26 +1026,22 @@ static u64 clk_osm_get_cpu_cycle_counter(int cpu)
 	return cycle_counter_ret;
 }
 
-static int clk_osm_read_lut(struct platform_device *pdev, struct clk_osm *c, int cpu)
+static int clk_osm_read_lut(struct platform_device *pdev, struct clk_osm *c)
 {
-	u32 data, src, lval, i, j = c->osm_table_size;
+	u32 data, src, lval, i, j = OSM_TABLE_SIZE;
 	struct clk_vdd_class *vdd = osm_clks_init[c->cluster_num].vdd_class;
 
-	for (i = 0; i < c->osm_table_size; i++) {
-		unsigned long int freq;
-
+	for (i = 0; i < OSM_TABLE_SIZE; i++) {
 		data = clk_osm_read_reg(c, FREQ_REG + i * OSM_REG_SIZE);
 		src = ((data & GENMASK(31, 30)) >> 30);
 		lval = (data & GENMASK(7, 0));
 		c->osm_table[i].ccount = CORE_COUNT_VAL(data);
 		c->osm_table[i].lval = lval;
 
-		freq = (!src) ? OSM_INIT_RATE : XO_RATE * lval;
-
-		if (should_skip(freq / 1000, cpu))
-		continue;
-
-		c->osm_table[i].frequency = freq;
+		if (!src)
+			c->osm_table[i].frequency = OSM_INIT_RATE;
+		else
+			c->osm_table[i].frequency = XO_RATE * lval;
 
 		data = clk_osm_read_reg(c, VOLT_REG + i * OSM_REG_SIZE);
 		c->osm_table[i].virtual_corner =
@@ -1079,7 +1053,7 @@ static int clk_osm_read_lut(struct platform_device *pdev, struct clk_osm *c, int
 			 c->osm_table[i].virtual_corner,
 			 c->osm_table[i].open_loop_volt);
 
-		if (i > 0 && j == c->osm_table_size &&
+		if (i > 0 && j == OSM_TABLE_SIZE &&
 				c->osm_table[i].frequency ==
 					c->osm_table[i - 1].frequency &&
 			c->osm_table[i].ccount == c->osm_table[i - 1].ccount)
@@ -1312,21 +1286,21 @@ static int clk_cpu_osm_driver_probe(struct platform_device *pdev)
 	if (val & BIT(0))
 		perfcl_clk.per_core_dcvs = true;
 
-	rc = clk_osm_read_lut(pdev, &l3_clk, -1);
+	rc = clk_osm_read_lut(pdev, &l3_clk);
 	if (rc) {
 		dev_err(&pdev->dev, "Unable to read OSM LUT for L3, rc=%d\n",
 			rc);
 		return rc;
 	}
 
-	rc = clk_osm_read_lut(pdev, &pwrcl_clk, 0);
+	rc = clk_osm_read_lut(pdev, &pwrcl_clk);
 	if (rc) {
 		dev_err(&pdev->dev, "Unable to read OSM LUT for power cluster, rc=%d\n",
 			rc);
 		return rc;
 	}
 
-	rc = clk_osm_read_lut(pdev, &perfcl_clk, 4);
+	rc = clk_osm_read_lut(pdev, &perfcl_clk);
 	if (rc) {
 		dev_err(&pdev->dev, "Unable to read OSM LUT for perf cluster, rc=%d\n",
 			rc);
