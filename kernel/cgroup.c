@@ -2945,8 +2945,10 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
 
 	/* Boost CPU to the max for 500 ms when launcher becomes a top app */
-	if (!memcmp(tsk->comm, "s.nexuslauncher", sizeof("s.nexuslauncher")) &&
-		!memcmp(cgrp->kn->name, "top-app", sizeof("top-app")) && !ret) {
+	if (!memcmp(cgrp->kn->name, "top-app", sizeof("top-app")) &&
+		(!memcmp(tsk->comm, "s.nexuslauncher", sizeof("s.nexuslauncher")) ||
+		!memcmp(tsk->comm, "com.pixeldust.launcher", sizeof("com.pixeldust.launcher"))) &&
+		!ret) {
 		cpu_input_boost_kick_max(500);
 		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 500);
 	}
