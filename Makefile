@@ -740,6 +740,7 @@ KBUILD_CFLAGS	+= -O3 $(call cc-disable-warning,maybe-uninitialized,)
 else
 KBUILD_CFLAGS   += -O3
 endif
+endif
 
 ifdef CONFIG_CC_WERROR
 KBUILD_CFLAGS	+= -Werror
