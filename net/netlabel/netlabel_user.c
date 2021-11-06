@@ -97,12 +97,10 @@ int __init netlbl_netlink_init(void)
 struct audit_buffer *netlbl_audit_start_common(int type,
 					       struct netlbl_audit *audit_info)
 {
+#ifdef CONFIG_AUDIT
 	struct audit_buffer *audit_buf;
 	char *secctx;
 	u32 secctx_len;
-
-	if (audit_enabled == 0)
-		return NULL;
 
 	audit_buf = audit_log_start(current->audit_context, GFP_ATOMIC, type);
 	if (audit_buf == NULL)
@@ -121,4 +119,6 @@ struct audit_buffer *netlbl_audit_start_common(int type,
 	}
 
 	return audit_buf;
+#endif
+	return NULL;
 }

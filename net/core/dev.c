@@ -6403,8 +6403,6 @@ static void dev_change_rx_flags(struct net_device *dev, int flags)
 static int __dev_set_promiscuity(struct net_device *dev, int inc, bool notify)
 {
 	unsigned int old_flags = dev->flags;
-	kuid_t uid;
-	kgid_t gid;
 
 	ASSERT_RTNL();
 
@@ -6428,7 +6426,9 @@ static int __dev_set_promiscuity(struct net_device *dev, int inc, bool notify)
 		pr_info("device %s %s promiscuous mode\n",
 			dev->name,
 			dev->flags & IFF_PROMISC ? "entered" : "left");
-		if (audit_enabled) {
+#ifdef CONFIG_AUDIT
+	        kuid_t uid;
+	        kgid_t gid;
 			current_uid_gid(&uid, &gid);
 			audit_log(current->audit_context, GFP_ATOMIC,
 				AUDIT_ANOM_PROMISCUOUS,
@@ -6439,7 +6439,7 @@ static int __dev_set_promiscuity(struct net_device *dev, int inc, bool notify)
 				from_kuid(&init_user_ns, uid),
 				from_kgid(&init_user_ns, gid),
 				audit_get_sessionid(current));
-		}
+#endif
 
 		dev_change_rx_flags(dev, IFF_PROMISC);
 	}
