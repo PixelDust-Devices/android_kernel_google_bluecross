@@ -51,6 +51,10 @@
 #define P9221_INT_ENABLE_REG			0x38
 #define P9221_COM_REG				0x4E
 
+#define TXID_TYPE_MASK			0xFF000000 /* bit[24-31] */
+#define TXID_TYPE_SHIFT			24
+#define TXID_DD_TYPE			0xE0
+
 enum p9221_align_mfg_chk_state {
 	ALIGN_MFG_FAILED = -1,
 	ALIGN_MFG_CHECKING,
@@ -226,6 +230,7 @@ struct p9221_charger_platform_data {
 	int				nb_alignment_freq;
 	int				*alignment_freq;
 	u32				alignment_scalar;
+	u32				power_mitigate_threshold;
 	u32				alignment_hysteresis;
 };
 
@@ -244,6 +249,7 @@ struct p9221_charger_data {
 	struct delayed_work		align_work;
 	struct delayed_work		tx_work;
 	struct delayed_work		icl_ramp_work;
+	struct delayed_work		power_mitigation_work;
 	struct work_struct		uevent_work;
 	struct alarm			icl_ramp_alarm;
 	struct timer_list		vrect_timer;
@@ -284,6 +290,10 @@ struct p9221_charger_data {
 	int				alignment_time;
 	u32				current_filtered;
 	u32				current_sample_cnt;
+	u32				mitigate_threshold;
+	u32				fod_cnt;
+	bool				trigger_power_mitigation;
+	bool                            wait_for_online;
 };
 
 struct p9221_prop_reg_map_entry {

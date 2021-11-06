@@ -347,6 +347,7 @@ struct max1720x_chip {
 	u16 RSense;
 	u16 RConfig;
 	int cycle_count;
+	int cycle_count_offset;
 	bool init_complete;
 	bool resume_complete;
 	u16 health_status;
@@ -385,6 +386,7 @@ struct max1720x_chip {
 	 * fake_temp>0 means fake the battery temp
 	 */
 	u16 fake_temp;
+	int batt_health;
 };
 
 static inline int max1720x_regmap_read(struct regmap *map,
@@ -1035,7 +1037,7 @@ static int max1720x_get_battery_health(struct max1720x_chip *chip)
 
 	if (chip->health_status & MAX1720X_STATUS_TMX) {
 		chip->health_status &= ~MAX1720X_STATUS_TMX;
-		return POWER_SUPPLY_HEALTH_OVERHEAT;
+		return POWER_SUPPLY_HEALTH_HOT;
 	}
 
 	return POWER_SUPPLY_HEALTH_GOOD;
@@ -1132,21 +1134,28 @@ static void max1720x_handle_update_nconvgcfg(struct max1720x_chip *chip,
 #define MAX17201_HIST_CYCLE_COUNT_OFFSET	0x4
 #define MAX17201_HIST_TIME_OFFSET		0xf
 
-static int max1720x_get_cycle_count_offset(const struct max1720x_chip *chip)
+static int max1720x_get_cycle_count_offset(struct max1720x_chip *chip)
 {
 	int offset = 0, i, history_count;
 	struct max1720x_history hi;
 
+	mutex_lock(&chip->history_lock);
 	history_count = max1720x_history_read(&hi, chip);
+	if (history_count < 0) {
+		mutex_unlock(&chip->history_lock);
+		return 0;
+	}
+
 	for (i = 0; i < history_count; i++) {
 		u16 *entry = &hi.history[i * MAX1720X_HISTORY_PAGE_SIZE];
 
 		if (entry[MAX17201_HIST_CYCLE_COUNT_OFFSET] == 0 &&
 		    entry[MAX17201_HIST_TIME_OFFSET] != 0) {
-			offset = MAXIM_CYCLE_COUNT_RESET;
+			offset += MAXIM_CYCLE_COUNT_RESET;
 			break;
 		}
 	}
+	mutex_unlock(&chip->history_lock);
 
 	dev_dbg(chip->dev, "history_count=%d page_size=%d i=%d offset=%d\n",
 		history_count, MAX1720X_HISTORY_PAGE_SIZE, i, offset);
@@ -1165,11 +1174,14 @@ static int max1720x_get_cycle_count(struct max1720x_chip *chip)
 		return err;
 
 	cycle_count = reg_to_cycles(temp);
-	if (chip->cycle_count == -1 || cycle_count < chip->cycle_count)
-		cycle_count += max1720x_get_cycle_count_offset(chip);
+	if ((chip->cycle_count == -1) ||
+	    ((cycle_count + chip->cycle_count_offset) < chip->cycle_count))
+		chip->cycle_count_offset =
+			max1720x_get_cycle_count_offset(chip);
 
-	chip->cycle_count = cycle_count;
-	return cycle_count;
+	chip->cycle_count = cycle_count + chip->cycle_count_offset;
+
+	return chip->cycle_count;
 }
 
 
@@ -1196,7 +1208,10 @@ static int max1720x_get_property(struct power_supply *psy,
 			return val->intval;
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
-		val->intval = max1720x_get_battery_health(chip);
+		if (chip->batt_health != POWER_SUPPLY_HEALTH_UNKNOWN)
+			val->intval = chip->batt_health;
+		else
+			val->intval = max1720x_get_battery_health(chip);
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = max1720x_get_battery_soc(chip);
@@ -1656,6 +1671,9 @@ static int max1720x_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CAPACITY:
 		rc = max1720x_set_battery_soc(chip, val);
 		break;
+	case POWER_SUPPLY_PROP_HEALTH:
+		chip->batt_health = val->intval;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -1669,6 +1687,7 @@ static int max1720x_property_is_writeable(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_CAPACITY:
 	case POWER_SUPPLY_PROP_BATT_CE_CTRL:
+	case POWER_SUPPLY_PROP_HEALTH:
 		return 1;
 	default:
 		break;
@@ -1703,7 +1722,7 @@ static irqreturn_t max1720x_fg_irq_thread_fn(int irq, void *obj)
 	pm_runtime_get_sync(chip->dev);
 	if (!chip->init_complete || !chip->resume_complete) {
 		pm_runtime_put_sync(chip->dev);
-		return -EAGAIN;
+		return IRQ_HANDLED;
 	}
 	pm_runtime_put_sync(chip->dev);
 	err = REGMAP_READ(chip->regmap, MAX1720X_STATUS, &fg_status);
@@ -2305,8 +2324,6 @@ static int max1720x_init_chip(struct max1720x_chip *chip)
 	(void) max1720x_handle_dt_nconvgcfg(chip);
 
 	chip->fake_capacity = -EINVAL;
-	chip->init_complete = true;
-	chip->resume_complete = true;
 
 	ret = REGMAP_READ(chip->regmap, MAX1720X_STATUS, &data);
 	if (!ret && data & MAX1720X_STATUS_BR) {
@@ -2631,6 +2648,8 @@ static void max1720x_init_work(struct work_struct *work)
 	(void)max1720x_init_history(chip);
 	chip->cycle_count = -1;
 	chip->fake_temp = 0;
+	chip->init_complete = true;
+	chip->resume_complete = true;
 
 	if (chip->psy)
 		power_supply_changed(chip->psy);
@@ -2700,7 +2719,6 @@ static int max1720x_probe(struct i2c_client *client,
 	else
 		chip->batt_update_high_temp_threshold = data32;
 
-
 	psy_cfg.drv_data = chip;
 	chip->psy = devm_power_supply_register(dev,
 					       &max1720x_psy_desc, &psy_cfg);
@@ -2723,6 +2741,8 @@ static int max1720x_probe(struct i2c_client *client,
 	}
 
 	max1720x_set_serial_number(chip);
+
+	chip->batt_health = POWER_SUPPLY_HEALTH_UNKNOWN;
 
 	INIT_WORK(&chip->cycle_count_work, max1720x_cycle_count_work);
 	INIT_DELAYED_WORK(&chip->temp_notify_work, max1720x_temp_notify_work);
