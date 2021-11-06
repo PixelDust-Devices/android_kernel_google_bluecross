@@ -813,6 +813,9 @@ static void hdd_scan_inactivity_timer_handler(unsigned long scan_req)
  * wlan_hdd_scan_request_enqueue() - enqueue Scan Request
  * @adapter: Pointer to the adapter
  * @scan_req: Pointer to the scan request
+ * @source: source of scan request either vendor or nl
+ * @scan_id: scan id from wma
+ * @timestamp: timestamp value
  *
  * Enqueue scan request in the global HDD scan list.This list
  * stores the active scan request information.
@@ -2476,8 +2479,14 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	qdf_runtime_pm_prevent_suspend(&pHddCtx->runtime_context.scan);
 	wma_get_scan_id(&scan_req_id);
 	scan_req.scan_id = scan_req_id;
-	wlan_hdd_scan_request_enqueue(pAdapter, request, source,
+	status = wlan_hdd_scan_request_enqueue(pAdapter, request, source,
 			scan_req.scan_id, scan_req.timestamp);
+	if (status) {
+		qdf_runtime_pm_allow_suspend(&pHddCtx->runtime_context.scan);
+		hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_SCAN);
+		goto free_mem;
+	}
+
 	pAdapter->scan_info.mScanPending = true;
 	status = sme_scan_request(WLAN_HDD_GET_HAL_CTX(pAdapter),
 				pAdapter->sessionId, &scan_req,
